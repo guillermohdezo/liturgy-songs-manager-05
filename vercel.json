@@ -1,8 +1,14 @@
 {
   "buildCommand": "cd api && npm install && npm install --save-dev @types/express @types/cors @types/jsonwebtoken @types/multer && npm run build",
   "outputDirectory": "api/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/handler"
+    }
+  ],
   "functions": {
-    "api/**/*.ts": {
+    "api/handler.ts": {
       "memory": 1024,
       "maxDuration": 30
     }
