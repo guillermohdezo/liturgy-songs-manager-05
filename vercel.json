@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd api && npm ci --only=prod && npm install --save-dev typescript && npm run build",
+  "buildCommand": "cd api && npm ci && npm run build",
   "outputDirectory": "api/dist",
   "functions": {
     "api/**/*.ts": {
