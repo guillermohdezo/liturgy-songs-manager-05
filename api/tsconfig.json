@@ -14,8 +14,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true,
-    "types": ["node", "express", "cors", "jsonwebtoken", "multer"]
+    "allowJs": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
