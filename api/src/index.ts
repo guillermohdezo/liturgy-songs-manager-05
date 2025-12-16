@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
-import { getReadingsFromVatican } from './lecturas.js';
-import { upload } from './multer.js';
+import { getReadingsFromVatican } from './lecturas';
+import { upload } from './multer';
 
 // Load environment variables from .env.local first, then fall back to .env
 const envPath = process.env.NODE_ENV === 'production' 
