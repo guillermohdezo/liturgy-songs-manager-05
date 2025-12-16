@@ -54,8 +54,9 @@ interface AuthRequest extends Request {
   params: Record<string, string>;
   query: Record<string, any>;
   body: any;
-  file?: Express.Multer.File;
-  files?: { [fieldname: string]: Express.Multer.File[] };
+  file?: any;
+  files?: any;
+  headers: Record<string, any>;
 }
 
 // Middleware: Verify JWT
