@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
+import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Misa, MisaCanto, Canto, SongType, LecturasResponse } from '@/types/database';
 import { SONG_TYPE_LABELS, SONG_TYPES_ORDER } from '@/types/database';
 import { ArrowLeft, Plus, Music, Play, Book, Loader2, GripVertical, X } from 'lucide-react';
+import AudioPlayer from '@/components/AudioPlayer';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import CantoSelectorDialog from '@/components/misas/CantoSelectorDialog';
@@ -19,6 +21,7 @@ export default function MisaDetail() {
   const [loading, setLoading] = useState(true);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectedTipo, setSelectedTipo] = useState<SongType | null>(null);
+  const { token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -28,31 +31,16 @@ export default function MisaDetail() {
   }, [id]);
 
   const fetchMisaData = async () => {
-    if (!id) return;
+    if (!id || !token) return;
 
     try {
-      // Fetch misa
-      const { data: misaData, error: misaError } = await supabase
-        .from('misas')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (misaError) throw misaError;
+      // Fetch misa with cantos
+      const misaData = await ApiClient.getMisa(id, token);
+      console.log('Misa data received:', misaData);
+      console.log('Cantos:', misaData.cantos);
+      
       setMisa(misaData);
-
-      // Fetch misa cantos with canto details
-      const { data: cantosData, error: cantosError } = await supabase
-        .from('misa_cantos')
-        .select(`
-          *,
-          canto:cantos(*)
-        `)
-        .eq('misa_id', id)
-        .order('orden');
-
-      if (cantosError) throw cantosError;
-      setMisaCantos(cantosData || []);
+      setMisaCantos(misaData.cantos || []);
     } catch (error) {
       console.error('Error fetching misa:', error);
       toast({
@@ -71,21 +59,12 @@ export default function MisaDetail() {
   };
 
   const handleCantoSelected = async (canto: Canto) => {
-    if (!id || !selectedTipo) return;
+    if (!id || !selectedTipo || !token) return;
 
     try {
       const orden = misaCantos.filter(mc => mc.tipo === selectedTipo).length;
 
-      const { error } = await supabase
-        .from('misa_cantos')
-        .insert({
-          misa_id: id,
-          canto_id: canto.id,
-          tipo: selectedTipo,
-          orden,
-        });
-
-      if (error) throw error;
+      await ApiClient.addCantoToMisa(id, canto.id, selectedTipo, orden, token);
 
       toast({
         title: 'Canto agregado',
@@ -94,10 +73,16 @@ export default function MisaDetail() {
 
       fetchMisaData();
     } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? (error as any).message
+        : 'No se pudo agregar el canto';
+      
       console.error('Error adding canto:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo agregar el canto',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -107,13 +92,10 @@ export default function MisaDetail() {
   };
 
   const handleRemoveCanto = async (misaCantoId: string) => {
+    if (!token) return;
+    
     try {
-      const { error } = await supabase
-        .from('misa_cantos')
-        .delete()
-        .eq('id', misaCantoId);
-
-      if (error) throw error;
+      await ApiClient.removeCantoFromMisa(misaCantoId, token);
 
       toast({
         title: 'Canto eliminado',
@@ -122,10 +104,16 @@ export default function MisaDetail() {
 
       fetchMisaData();
     } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? (error as any).message
+        : 'No se pudo eliminar el canto';
+      
       console.error('Error removing canto:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo eliminar el canto',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -147,6 +135,8 @@ export default function MisaDetail() {
       </Layout>
     );
   }
+  console.log(misa);
+  
 
   if (!misa) {
     return (
@@ -251,10 +241,16 @@ export default function MisaDetail() {
                           <p className="font-medium truncate">{mc.canto?.nombre}</p>
                         </div>
 
+                        <AudioPlayer
+                          audioUrl={mc.canto?.audio_url}
+                          variant="compact"
+                          className="flex-shrink-0"
+                        />
+
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           onClick={() => handleRemoveCanto(mc.id)}
                         >
                           <X className="w-4 h-4 text-destructive" />

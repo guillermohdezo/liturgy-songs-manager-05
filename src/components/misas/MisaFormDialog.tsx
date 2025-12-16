@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,7 @@ export default function MisaFormDialog({ open, onOpenChange, misa, onSuccess }: 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ fecha?: string; descripcion?: string }>({});
   
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function MisaFormDialog({ open, onOpenChange, misa, onSuccess }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm() || !user || !date) return;
+    if (!validateForm() || !user || !token || !date) return;
     
     setLoading(true);
 
@@ -82,24 +82,16 @@ export default function MisaFormDialog({ open, onOpenChange, misa, onSuccess }: 
       const misaData = {
         fecha: format(date, 'yyyy-MM-dd'),
         descripcion: descripcion || null,
-        usuario_id: user.id,
       };
 
       if (misa) {
-        const { error } = await supabase
-          .from('misas')
-          .update(misaData)
-          .eq('id', misa.id);
-
-        if (error) throw error;
+        await ApiClient.updateMisa(misa.id, misaData, token);
         toast({
           title: 'Misa actualizada',
           description: 'La misa ha sido actualizada correctamente',
         });
       } else {
-        const { error } = await supabase.from('misas').insert(misaData);
-
-        if (error) throw error;
+        await ApiClient.createMisa(misaData, token);
         toast({
           title: 'Misa creada',
           description: 'La misa ha sido creada correctamente',

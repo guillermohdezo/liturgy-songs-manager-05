@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Book, Loader2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ApiClient } from '@/integrations/api/client';
 
 interface Lectura {
   cita: string;
@@ -33,16 +34,13 @@ export default function LecturasSection({ fecha }: LecturasSectionProps) {
     setError(null);
 
     try {
-      const response = await fetch(
-        `https://api-evangelio.onrender.com/api/lecturas?fecha=${fecha}`
-      );
-
-      if (!response.ok) {
+      const result = await ApiClient.getLecturas(fecha);
+      
+      if (!result.success) {
         throw new Error('No se pudieron obtener las lecturas');
       }
 
-      const data = await response.json();
-      setLecturas(data);
+      setLecturas(result.lecturas);
     } catch (err) {
       console.error('Error fetching lecturas:', err);
       setError('No se pudieron cargar las lecturas del día');

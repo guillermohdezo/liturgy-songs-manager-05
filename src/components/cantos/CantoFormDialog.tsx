@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +41,7 @@ export default function CantoFormDialog({ open, onOpenChange, canto, onSuccess }
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ nombre?: string; tipo?: string; tiempos_liturgicos?: string }>({});
   
+  const { token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,29 +104,42 @@ export default function CantoFormDialog({ open, onOpenChange, canto, onSuccess }
   };
 
   const uploadFile = async (file: File, folder: string): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from('cantos')
-      .upload(fileName, file);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', folder);
 
-    if (error) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiUrl}/api/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
       console.error('Upload error:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir el archivo',
+        variant: 'destructive',
+      });
       return null;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('cantos')
-      .getPublicUrl(fileName);
-
-    return publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm() || !token) return;
     
     setLoading(true);
 
@@ -132,7 +147,7 @@ export default function CantoFormDialog({ open, onOpenChange, canto, onSuccess }
       let fotoUrl = canto?.foto_url || null;
       let audioUrl = canto?.audio_url || null;
 
-      // Upload new files if selected
+      // Upload new files if selected (placeholder for future implementation)
       if (fotoFile) {
         fotoUrl = await uploadFile(fotoFile, 'fotos');
       }
@@ -149,20 +164,13 @@ export default function CantoFormDialog({ open, onOpenChange, canto, onSuccess }
       };
 
       if (canto) {
-        const { error } = await supabase
-          .from('cantos')
-          .update(cantoData)
-          .eq('id', canto.id);
-
-        if (error) throw error;
+        await ApiClient.updateCanto(canto.id, cantoData, token);
         toast({
           title: 'Canto actualizado',
           description: 'El canto ha sido actualizado correctamente',
         });
       } else {
-        const { error } = await supabase.from('cantos').insert(cantoData);
-
-        if (error) throw error;
+        await ApiClient.createCanto(cantoData, token);
         toast({
           title: 'Canto creado',
           description: 'El canto ha sido agregado al catálogo',
@@ -171,10 +179,16 @@ export default function CantoFormDialog({ open, onOpenChange, canto, onSuccess }
 
       onSuccess();
     } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? (error as any).message
+        : 'No se pudo guardar el canto';
+      
       console.error('Error saving canto:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo guardar el canto',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

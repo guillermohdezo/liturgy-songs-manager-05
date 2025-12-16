@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,6 +35,7 @@ export default function CantoSelectorDialog({
   const [filterTipo, setFilterTipo] = useState<string>('all');
   const [filterTiempo, setFilterTiempo] = useState<string>('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const { token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -49,14 +51,11 @@ export default function CantoSelectorDialog({
   }, [open, tipoSugerido]);
 
   const fetchCantos = async () => {
+    if (!token) return;
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('cantos')
-        .select('*')
-        .order('nombre');
-
-      if (error) throw error;
+      const data = await ApiClient.getCantos(token);
       setCantos(data || []);
     } catch (error) {
       console.error('Error fetching cantos:', error);

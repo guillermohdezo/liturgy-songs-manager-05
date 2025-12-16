@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd api && npm install && npm run build",
+  "outputDirectory": "api/dist",
+  "env": {
+    "VITE_SUPABASE_URL": "@supabase_url",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "JWT_SECRET": "@jwt_secret"
+  },
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 3008,
+      "maxDuration": 30
+    }
+  }
+}

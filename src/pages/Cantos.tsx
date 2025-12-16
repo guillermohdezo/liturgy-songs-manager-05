@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
+import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ export default function Cantos() {
   const [showForm, setShowForm] = useState(false);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
   const [deletingCanto, setDeletingCanto] = useState<Canto | null>(null);
+  const { token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,12 +39,16 @@ export default function Cantos() {
 
   const fetchCantos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('cantos')
-        .select('*')
-        .order('nombre');
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'No hay sesión activa',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-      if (error) throw error;
+      const data = await ApiClient.getCantos(token);
       setCantos(data || []);
     } catch (error) {
       console.error('Error fetching cantos:', error);
@@ -57,15 +63,10 @@ export default function Cantos() {
   };
 
   const handleDelete = async () => {
-    if (!deletingCanto) return;
+    if (!deletingCanto || !token) return;
 
     try {
-      const { error } = await supabase
-        .from('cantos')
-        .delete()
-        .eq('id', deletingCanto.id);
-
-      if (error) throw error;
+      await ApiClient.deleteCanto(deletingCanto.id, token);
 
       toast({
         title: 'Canto eliminado',
@@ -73,10 +74,16 @@ export default function Cantos() {
       });
       fetchCantos();
     } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+        ? (error as any).message
+        : 'No se pudo eliminar el canto';
+      
       console.error('Error deleting canto:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo eliminar el canto',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -91,6 +98,9 @@ export default function Cantos() {
       (canto.tiempos_liturgicos && canto.tiempos_liturgicos.includes(filterTiempo as LiturgicalSeason));
     return matchesSearch && matchesTipo && matchesTiempo;
   });
+
+  console.log(filteredCantos);
+  
 
   return (
     <Layout>

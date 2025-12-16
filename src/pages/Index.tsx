@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { ApiClient } from '@/integrations/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ export default function Index() {
   const [showForm, setShowForm] = useState(false);
   const [editingMisa, setEditingMisa] = useState<Misa | null>(null);
   const [deletingMisa, setDeletingMisa] = useState<Misa | null>(null);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,12 +38,16 @@ export default function Index() {
 
   const fetchMisas = async () => {
     try {
-      const { data, error } = await supabase
-        .from('misas')
-        .select('*')
-        .order('fecha', { ascending: false });
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'No hay sesión activa',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-      if (error) throw error;
+      const data = await ApiClient.getMisas(token);
       setMisas(data || []);
     } catch (error) {
       console.error('Error fetching misas:', error);
@@ -58,15 +62,10 @@ export default function Index() {
   };
 
   const handleDelete = async () => {
-    if (!deletingMisa) return;
+    if (!deletingMisa || !token) return;
 
     try {
-      const { error } = await supabase
-        .from('misas')
-        .delete()
-        .eq('id', deletingMisa.id);
-
-      if (error) throw error;
+      await ApiClient.deleteMisa(deletingMisa.id, token);
 
       toast({
         title: 'Misa eliminada',
@@ -166,26 +165,34 @@ export default function Index() {
                 className="liturgical-card p-5 animate-slide-up"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
                       <Calendar className="w-6 h-6 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="font-serif font-semibold text-lg">
+                    <div className="min-w-0">
+                      <h3 className="font-serif font-semibold text-lg truncate">
                         {format(parseISO(misa.fecha), "EEEE d 'de' MMMM", { locale: es })}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground truncate">
                         {misa.descripcion || 'Sin descripción'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full md:w-auto flex-wrap md:flex-nowrap justify-end">
+                    <Link to={`/misa/${misa.id}`} className="flex-1 md:flex-none">
+                      <Button variant="outline" size="sm" className="w-full md:w-auto">
+                        <Music className="w-4 h-4 mr-2" />
+                        Cantos
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </Link>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setEditingMisa(misa)}
+                      className="flex-shrink-0"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -193,16 +200,10 @@ export default function Index() {
                       variant="ghost"
                       size="icon"
                       onClick={() => setDeletingMisa(misa)}
+                      className="flex-shrink-0"
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
-                    <Link to={`/misa/${misa.id}`}>
-                      <Button variant="outline" size="sm">
-                        <Music className="w-4 h-4 mr-2" />
-                        Cantos
-                        <ChevronRight className="w-4 h-4 ml-1" />
-                      </Button>
-                    </Link>
                   </div>
                 </div>
               </div>
