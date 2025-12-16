@@ -51,6 +51,11 @@ interface JWTPayload {
 
 interface AuthRequest extends Request {
   user?: JWTPayload;
+  params: Record<string, string>;
+  query: Record<string, any>;
+  body: any;
+  file?: Express.Multer.File;
+  files?: { [fieldname: string]: Express.Multer.File[] };
 }
 
 // Middleware: Verify JWT

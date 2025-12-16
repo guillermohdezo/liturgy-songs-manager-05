@@ -1,4 +1,5 @@
-import multer from 'multer';
+import multer, { FileFilterCallback } from 'multer';
+import { Request } from 'express';
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -8,7 +9,7 @@ export const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     // Allow common image and audio formats
     const allowedMimes = [
       'image/jpeg',
