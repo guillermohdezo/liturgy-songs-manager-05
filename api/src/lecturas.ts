@@ -16,7 +16,7 @@ function formatDateForUrl(date: Date): string {
 function extractReadings(html: string) {
   const $ = load(html);
   
-  let indicazioneLiturgica = null;
+  let indicazioneLiturgica: string | null = null;
   let primeraLectura = {
     cita: null as string | null,
     lectura: null as string | null
