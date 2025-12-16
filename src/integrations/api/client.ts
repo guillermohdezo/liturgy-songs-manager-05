@@ -22,11 +22,16 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const fullUrl = `${API_URL}${endpoint}`;
+    console.log(`[API] ${method} ${fullUrl}`, { hasToken: !!token });
+
+    const response = await fetch(fullUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    console.log(`[API] Response status: ${response.status}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -46,6 +51,7 @@ export class ApiClient {
   }
 
   static async login(email: string, password: string) {
+    console.log('[API] Attempting login with:', email);
     return this.request<any>('/api/auth/login', {
       method: 'POST',
       body: { email, password },
@@ -61,6 +67,7 @@ export class ApiClient {
 
   // Misas endpoints
   static async getMisas(token: string) {
+    console.log('[API] Fetching misas with token:', token?.substring(0, 10) + '...');
     return this.request<any[]>('/api/misas', { token });
   }
 

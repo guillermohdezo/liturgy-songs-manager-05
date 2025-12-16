@@ -37,7 +37,10 @@ const localhostOrigins = [
   'http://localhost:5174',
   'http://localhost:8080',
   'http://localhost:8100',
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'https://localhost',
+  'https://localhost:443',
+  'capacitor://localhost'
 ];
 
 const configuredOrigins = process.env.CORS_ORIGINS
@@ -97,14 +100,17 @@ const verifyToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const token = authHeader?.split(' ')[1];
 
   if (!token) {
+    console.log('[DEBUG] No token provided');
     return res.status(401).json({ error: 'No token provided' });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    console.log('[DEBUG] Token verified for user:', decoded.userId);
     req.user = decoded;
     next();
   } catch (error) {
+    console.log('[DEBUG] Invalid token:', error);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
@@ -200,15 +206,20 @@ app.post('/api/auth/logout', verifyToken, (req: Request, res: Response) => {
 // Get all misas for user
 app.get('/api/misas', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
+    console.log('[DEBUG] GET /api/misas - User ID:', req.user?.userId);
+    
     const { data, error } = await supabase
       .from('misas')
       .select('*')
       .eq('usuario_id', req.user!.userId)
       .order('fecha', { ascending: false });
 
+    console.log('[DEBUG] Misas query - Error:', error, 'Data count:', data?.length);
+    
     if (error) throw error;
     res.json(data);
   } catch (error) {
+    console.log('[DEBUG] Error fetching misas:', error);
     res.status(500).json({ error: 'Failed to fetch misas' });
   }
 });
