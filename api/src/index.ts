@@ -31,15 +31,32 @@ const supabase = createClient(
 );
 
 // Middleware
-const corsOrigins = process.env.CORS_ORIGINS
+const localhostOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:8080',
+  'http://localhost:8100',
+  'http://127.0.0.1:5173'
+];
+
+const configuredOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8080', 'http://localhost:8100', 'http://127.0.0.1:5173'];
+  : [];
+
+const allowedOrigins = [...localhostOrigins, ...configuredOrigins];
+
+// Debug: Log CORS origins (remove in production)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('CORS Origins allowed:', allowedOrigins);
+}
 
 app.use(cors({
-  origin: corsOrigins,
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200,
 }));
 app.use(express.json());
 
