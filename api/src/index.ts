@@ -446,14 +446,23 @@ app.put('/api/cantos/:id', verifyToken, async (req: AuthRequest, res: Response) 
 // Delete canto
 app.delete('/api/cantos/:id', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
+    const cantoId = req.params.id;
+    console.log('[DEBUG] DELETE canto:', cantoId);
+
     const { error } = await supabase
       .from('cantos')
       .delete()
-      .eq('id', req.params.id);
+      .eq('id', cantoId);
 
-    if (error) throw error;
+    if (error) {
+      console.log('[DEBUG] Delete error:', error);
+      throw error;
+    }
+    
+    console.log('[DEBUG] Canto deleted successfully');
     res.json({ message: 'Canto deleted' });
   } catch (error) {
+    console.log('[DEBUG] Error deleting canto:', error);
     res.status(500).json({ error: 'Failed to delete canto' });
   }
 });

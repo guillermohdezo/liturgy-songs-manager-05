@@ -68,11 +68,15 @@ export default function Cantos() {
     try {
       await ApiClient.deleteCanto(deletingCanto.id, token);
 
+      // Update local state immediately
+      setCantos(cantos.filter(c => c.id !== deletingCanto.id));
+
       toast({
         title: 'Canto eliminado',
         description: 'El canto ha sido eliminado correctamente',
       });
-      fetchCantos();
+      
+      setDeletingCanto(null);
     } catch (error) {
       const errorMessage = error instanceof Error 
         ? error.message 
