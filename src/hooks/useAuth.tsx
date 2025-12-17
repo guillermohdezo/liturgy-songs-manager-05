@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { Preferences } from '@capacitor/preferences';
 import { ApiClient } from '@/integrations/api/client';
 
 export type AppRole = 'admin' | 'usuario';
@@ -14,6 +15,55 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_TOKEN_KEY = 'auth_token';
+
+// Helper functions for storage (works both on web and Capacitor)
+const getStoredToken = async (): Promise<string | null> => {
+  try {
+    // Try Capacitor Preferences first (works on mobile)
+    const { value } = await Preferences.get({ key: AUTH_TOKEN_KEY });
+    if (value) return value;
+  } catch (error) {
+    console.log('[Auth] Preferences not available, trying localStorage');
+  }
+
+  // Fallback to localStorage (works on web)
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch (error) {
+    console.log('[Auth] localStorage not available');
+    return null;
+  }
+};
+
+const setStoredToken = async (token: string) => {
+  try {
+    // Try Capacitor Preferences first
+    await Preferences.set({ key: AUTH_TOKEN_KEY, value: token });
+  } catch (error) {
+    console.log('[Auth] Preferences not available, trying localStorage');
+    try {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } catch (e) {
+      console.log('[Auth] localStorage not available');
+    }
+  }
+};
+
+const removeStoredToken = async () => {
+  try {
+    // Try Capacitor Preferences first
+    await Preferences.remove({ key: AUTH_TOKEN_KEY });
+  } catch (error) {
+    console.log('[Auth] Preferences not available, trying localStorage');
+    try {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch (e) {
+      console.log('[Auth] localStorage not available');
+    }
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ id: string; email: string; nombre?: string } | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -26,23 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const initializeAuth = async () => {
     try {
-      // Try to restore token from localStorage
-      const storedToken = localStorage.getItem('auth_token');
+      const storedToken = await getStoredToken();
       if (storedToken) {
+        console.log('[Auth] Token restored from storage:', storedToken.substring(0, 10) + '...');
         setToken(storedToken);
-        // Try to validate token by calling an protected endpoint
-        try {
-          // For now, just assume token is valid if it exists
-          // In production, you might want to verify it
-          console.log('Token restored from storage');
-        } catch (error) {
-          console.error('Token validation failed:', error);
-          localStorage.removeItem('auth_token');
-          setToken(null);
-        }
       }
     } catch (error) {
-      console.error('Error initializing auth:', error);
+      console.error('[Auth] Error initializing auth:', error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: data.user.email,
       });
       setToken(data.token);
-      localStorage.setItem('auth_token', data.token);
+      await setStoredToken(data.token);
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -72,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         nombre: data.user.nombre,
       });
       setToken(data.token);
-      localStorage.setItem('auth_token', data.token);
+      await setStoredToken(data.token);
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -85,11 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await ApiClient.logout(token);
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[Auth] Logout error:', error);
     } finally {
       setUser(null);
       setToken(null);
-      localStorage.removeItem('auth_token');
+      await removeStoredToken();
     }
   };
 

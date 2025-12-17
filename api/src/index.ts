@@ -57,11 +57,9 @@ if (process.env.NODE_ENV !== 'production') {
 // CORS configuration function
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for debugging - restrict later
-    }
+    console.log('[CORS] Request origin:', origin);
+    // Allow all origins for now (debug)
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -206,15 +204,18 @@ app.post('/api/auth/logout', verifyToken, (req: Request, res: Response) => {
 // Get all misas for user
 app.get('/api/misas', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    console.log('[DEBUG] GET /api/misas - User ID:', req.user?.userId);
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+    console.log('[DEBUG] GET /api/misas - User:', { userId, userEmail });
     
     const { data, error } = await supabase
       .from('misas')
       .select('*')
-      .eq('usuario_id', req.user!.userId)
+      .eq('usuario_id', userId)
       .order('fecha', { ascending: false });
 
-    console.log('[DEBUG] Misas query - Error:', error, 'Data count:', data?.length);
+    console.log('[DEBUG] Misas query - Error:', error, 'Data:', data?.length || 0, 'records');
+    console.log('[DEBUG] Misas data:', JSON.stringify(data));
     
     if (error) throw error;
     res.json(data);
@@ -537,9 +538,52 @@ app.delete('/api/misas/:misaId/cantos/:misaCantoId', verifyToken, async (req: Au
   }
 });
 
+// Remove canto from misa (alternative endpoint for client compatibility)
+app.delete('/api/misa-cantos/:misaCantoId', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { misaCantoId } = req.params;
+
+    // Get the misa_canto to verify ownership indirectly
+    const { data: misaCanto, error: fetchError } = await supabase
+      .from('misa_cantos')
+      .select('misa_id')
+      .eq('id', misaCantoId)
+      .single();
+
+    if (fetchError || !misaCanto) {
+      return res.status(404).json({ error: 'Canto not found' });
+    }
+
+    // Verify misa ownership
+    const { data: misa, error: misaError } = await supabase
+      .from('misas')
+      .select('usuario_id')
+      .eq('id', misaCanto.misa_id)
+      .single();
+
+    if (misaError || misa?.usuario_id !== req.user!.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { error } = await supabase
+      .from('misa_cantos')
+      .delete()
+      .eq('id', misaCantoId);
+
+    if (error) throw error;
+    res.json({ message: 'Canto removed from misa' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to remove canto' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'OK' });
+  res.json({ 
+    status: 'OK',
+    origin: req.get('origin'),
+    userAgent: req.get('user-agent')
+  });
 });
 
 // Get readings from Vatican News for a specific date

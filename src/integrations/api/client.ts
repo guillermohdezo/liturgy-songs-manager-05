@@ -25,20 +25,44 @@ export class ApiClient {
     const fullUrl = `${API_URL}${endpoint}`;
     console.log(`[API] ${method} ${fullUrl}`, { hasToken: !!token });
 
-    const response = await fetch(fullUrl, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    try {
+      console.log('[API] Starting fetch...');
+      
+      // Add a timeout of 10 seconds
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('[API] TIMEOUT - Request took too long!');
+        controller.abort();
+      }, 10000);
 
-    console.log(`[API] Response status: ${response.status}`);
+      const response = await fetch(fullUrl, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      clearTimeout(timeoutId);
+      console.log(`[API] Response received - status: ${response.status}`);
+
+      if (!response.ok) {
+        console.log('[API] Response not ok, trying to parse error');
+        const error = await response.json();
+        console.log('[API] Error:', error);
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      console.log('[API] Parsing response JSON...');
+      const data = await response.json();
+      console.log('[API] Response parsed successfully, data length:', JSON.stringify(data).length);
+      return data as Promise<T>;
+    } catch (error) {
+      console.error('[API] Fetch error:', error);
+      if (error instanceof TypeError) {
+        console.error('[API] Network error - Request failed to complete');
+      }
+      throw error;
     }
-
-    return response.json() as Promise<T>;
   }
 
   // Auth endpoints
